@@ -43,6 +43,7 @@ struct listcmd {
   struct cmd *right; // right side of list
 };
 
+
 int fork1(void);  // Fork but exits on failure.
 struct cmd *parsecmd(char*);
 
@@ -57,17 +58,17 @@ runcmd(struct cmd *cmd)
   struct listcmd *lcmd;
 
   if(cmd == 0)
-    exit(0);
+    return;
 
   switch(cmd->type){
   default:
     fprintf(stderr, "unknown runcmd\n");
-    exit(-1);
+    break;
 
   case ' ':
     ecmd = (struct execcmd*)cmd;
     if(ecmd->argv[0] == 0)
-      exit(0);
+      break;
 
     if(strcmp(ecmd->argv[0], "cd") == 0){
       int count = 0;
@@ -76,19 +77,22 @@ runcmd(struct cmd *cmd)
       if (count != 2)
       {
         fprintf(stderr, "incorrect number of argument for cd\n");
-        exit(0);
+        break;
       }
       char* buf = ecmd->argv[1];
-      buf[strlen(buf)-1] = 0;  // chop \n
+      buf[strlen(buf)] = 0;  // chop \n
       if(chdir(ecmd->argv[1]) < 0)
         fprintf(stderr, "cannot cd \"%s\"\n", buf+3);
-      exit(0);
+      break;
     }
 
-
-    execvp(ecmd->argv[0], ecmd->argv);
-    perror("execvp");
-    exit(0);
+    int rid = fork1();
+    if (rid == 0)
+    {
+      execvp(ecmd->argv[0], ecmd->argv);
+      perror("execvp");
+    }
+    wait(NULL);
     break;
 
   case '>':
@@ -98,7 +102,7 @@ runcmd(struct cmd *cmd)
     int file_fd = open(rcmd->file, rcmd->mode, 0644);
     if(file_fd < 0){
       perror("open");
-      exit(1);
+      break;
     }
 
     dup2(file_fd, rcmd->fd);
@@ -113,7 +117,7 @@ runcmd(struct cmd *cmd)
     if (pipe(p) < 0)
     {
       perror("pipe");
-      exit(1);
+      break;
     }
 
     int pid2 = fork();
@@ -142,8 +146,6 @@ runcmd(struct cmd *cmd)
     wait(NULL);
     break;
 
-
-
   case ';':
     lcmd = (struct listcmd*)cmd;
 
@@ -158,7 +160,6 @@ runcmd(struct cmd *cmd)
     break;
   }
 
-  exit(0);
 }
 
 int
@@ -190,8 +191,8 @@ main(void)
     //     fprintf(stderr, "cannot cd \"%s\"\n", buf+3);
     //   continue;
     // }
-    if(fork1() == 0)
-      runcmd(parsecmd(buf));
+    // if(fork1() == 0)
+    runcmd(parsecmd(buf));
     wait(&r);
   }
   exit(0);
